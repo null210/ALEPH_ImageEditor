@@ -25,6 +25,8 @@ export function App() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [cloneActive, setCloneActive] = useState(false);
   const [brushSize, setBrushSize] = useState(0.04);
+  const [cropActive, setCropActive] = useState(false);
+  const [cropRect, setCropRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // 프로젝트 이미지가 바뀌면 HTMLImageElement를 다시 로드
   const dataUrl = project.image?.dataUrl ?? null;
@@ -59,6 +61,31 @@ export function App() {
       show('이미지를 불러오지 못했습니다.');
     }
   }, [actions, show]);
+
+  const handleCropApply = useCallback(() => {
+    if (!cropRect || !imageEl || !project.image) return;
+    const sx = Math.max(0, Math.floor(cropRect.x * imageEl.naturalWidth));
+    const sy = Math.max(0, Math.floor(cropRect.y * imageEl.naturalHeight));
+    const sw = Math.min(imageEl.naturalWidth - sx, Math.max(1, Math.floor(cropRect.width * imageEl.naturalWidth)));
+    const sh = Math.min(imageEl.naturalHeight - sy, Math.max(1, Math.floor(cropRect.height * imageEl.naturalHeight)));
+    if (sw < 2 || sh < 2) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { show('잘라내기를 적용하지 못했습니다.'); return; }
+    ctx.drawImage(imageEl, sx, sy, sw, sh, 0, 0, sw, sh);
+    actions.updateImage({ dataUrl: canvas.toDataURL('image/png'), width: sw, height: sh, scale: 1, x: 0.5, y: 0.5 });
+    setCropActive(false);
+    setCropRect(null);
+    show('이미지를 잘라냈습니다.');
+  }, [cropRect, imageEl, project.image, actions, show]);
+
+  const handleCropCancel = useCallback(() => {
+    setCropActive(false);
+    setCropRect(null);
+  }, []);
 
   const handleExportPng = useCallback(async () => {
     try {
@@ -177,6 +204,11 @@ export function App() {
         onBrushSizeChange={setBrushSize}
         canUndoClone={(project.cloneStrokes?.length ?? 0) > 0}
         onUndoClone={actions.undoClone}
+        cropActive={cropActive}
+        onCropToggle={() => { setCropActive((active) => !active); setCropRect(null); }}
+        canApplyCrop={cropRect !== null}
+        onCropApply={handleCropApply}
+        onCropCancel={handleCropCancel}
       />
       <main className="layout">
         <EditorCanvas
@@ -190,6 +222,9 @@ export function App() {
           brushSize={brushSize}
           onStartCloneStroke={actions.startCloneStroke}
           onAddCloneDab={actions.addCloneDab}
+          cropActive={cropActive}
+          cropRect={cropRect}
+          onCropRectChange={setCropRect}
         />
         <aside className="sidebar">
           <TextList

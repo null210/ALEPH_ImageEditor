@@ -20,6 +20,11 @@ interface Props {
   onBrushSizeChange: (size: number) => void;
   canUndoClone: boolean;
   onUndoClone: () => void;
+  cropActive: boolean;
+  onCropToggle: () => void;
+  canApplyCrop: boolean;
+  onCropApply: () => void;
+  onCropCancel: () => void;
 }
 
 export function Toolbar(props: Props) {
@@ -48,6 +53,9 @@ export function Toolbar(props: Props) {
         {toolButton('🗑️', '선택한 문구 삭제', props.onDeleteText, { danger: true, disabled: !props.canDeleteText })}
         {toolButton('🖌️', props.cloneActive ? '클론 도장 끄기' : '클론 도장 켜기', props.onCloneToggle, { active: props.cloneActive })}
         {toolButton('↩️', '클론 실행 취소', props.onUndoClone, { disabled: !props.canUndoClone })}
+        {toolButton('✂️', props.cropActive ? '잘라내기 모드 끄기' : '이미지 잘라내기', props.onCropToggle, { active: props.cropActive })}
+        {props.cropActive && toolButton('✅', '잘라내기 적용', props.onCropApply, { active: true, disabled: !props.canApplyCrop })}
+        {props.cropActive && toolButton('❌', '잘라내기 취소', props.onCropCancel, { danger: true })}
         {props.cloneActive && (
           <label className="toolbar-size" title="클론 도장 크기" data-tooltip="클론 도장 크기">
             <input type="range" min="0.01" max="0.12" step="0.005" value={props.brushSize} onChange={(e) => props.onBrushSizeChange(Number(e.target.value))} />

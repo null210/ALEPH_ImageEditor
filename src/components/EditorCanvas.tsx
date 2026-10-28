@@ -17,6 +17,9 @@ interface Props {
   brushSize: number;
   onStartCloneStroke: (stroke: CloneStroke) => void;
   onAddCloneDab: (id: string, dab: CloneDab) => void;
+  cropActive: boolean;
+  cropRect: { x: number; y: number; width: number; height: number } | null;
+  onCropRectChange: (rect: { x: number; y: number; width: number; height: number } | null) => void;
 }
 
 type Handle = 'nw' | 'ne' | 'sw' | 'se';
@@ -32,6 +35,7 @@ interface Interaction {
 export function EditorCanvas({
   project, image, selectedId, onSelect, onUpdateText, onUpdateImage,
   cloneActive, brushSize, onStartCloneStroke, onAddCloneDab,
+  cropActive, cropRect, onCropRectChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,6 +44,7 @@ export function EditorCanvas({
   const sampleRef = useRef<{ x: number; y: number } | null>(null);
   const imageResizeRef = useRef<{ startDistance: number; startScale: number; centerX: number; centerY: number } | null>(null);
   const imageDragRef = useRef<{ startX: number; startY: number; imageX: number; imageY: number } | null>(null);
+  const cropDragRef = useRef<{ startPoint: { x: number; y: number }; box: ReturnType<typeof imageDisplayBox> } | null>(null);
   const [imageSelected, setImageSelected] = useState(false);
   const [displayWidth, setDisplayWidth] = useState(0);
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
@@ -92,6 +97,25 @@ export function EditorCanvas({
       ctx.restore();
     }
 
+    if (cropActive && image && cropRect) {
+      const box = imageDisplayBox(project, image, target.width, target.height);
+      const left = box.left + cropRect.x * box.width;
+      const top = box.top + cropRect.y * box.height;
+      const width = cropRect.width * box.width;
+      const height = cropRect.height * box.height;
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, 0, target.width, top);
+      ctx.fillRect(0, top, left, height);
+      ctx.fillRect(left + width, top, target.width - left - width, height);
+      ctx.fillRect(0, top + height, target.width, target.height - top - height);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2 * dpr;
+      ctx.setLineDash([6 * dpr, 4 * dpr]);
+      ctx.strokeRect(left, top, width, height);
+      ctx.restore();
+    }
+
     if (selectedId) {
       const item = project.texts.find((text) => text.id === selectedId);
       if (item) {
@@ -133,7 +157,7 @@ export function EditorCanvas({
       }
       ctx.restore();
     }
-  }, [project, image, displayWidth, selectedId, imageSelected, cloneActive, brushSize, hoverPoint, samplePoint]);
+  }, [project, image, displayWidth, selectedId, imageSelected, cloneActive, brushSize, hoverPoint, samplePoint, cropActive, cropRect]);
 
   const pointInCanvas = (event: React.PointerEvent<HTMLCanvasElement>, target: { width: number; height: number }) => {
     const canvas = canvasRef.current!;
@@ -157,6 +181,16 @@ export function EditorCanvas({
     const point = pointInCanvas(event, target);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    if (cropActive && image && project.image) {
+      const box = imageDisplayBox(project, image, target.width, target.height);
+      if (point.x >= box.left && point.x <= box.left + box.width && point.y >= box.top && point.y <= box.top + box.height) {
+        cropDragRef.current = { startPoint: point, box };
+        canvas.setPointerCapture(event.pointerId);
+        onCropRectChange(null);
+      }
+      return;
+    }
 
     if (cloneActive) {
       const normalized = { x: point.x / target.width, y: point.y / target.height };
@@ -257,6 +291,26 @@ export function EditorCanvas({
       return;
     }
 
+    const cropDrag = cropDragRef.current;
+    if (cropDrag) {
+      const { startPoint, box } = cropDrag;
+      const left = clamp(Math.min(startPoint.x, point.x), box.left, box.left + box.width);
+      const top = clamp(Math.min(startPoint.y, point.y), box.top, box.top + box.height);
+      const right = clamp(Math.max(startPoint.x, point.x), box.left, box.left + box.width);
+      const bottom = clamp(Math.max(startPoint.y, point.y), box.top, box.top + box.height);
+      const width = right - left;
+      const height = bottom - top;
+      if (width >= 4 && height >= 4) {
+        onCropRectChange({
+          x: (left - box.left) / box.width,
+          y: (top - box.top) / box.height,
+          width: width / box.width,
+          height: height / box.height,
+        });
+      }
+      return;
+    }
+
     const imageResize = imageResizeRef.current;
     if (imageResize) {
       const distance = Math.hypot(point.x - imageResize.centerX, point.y - imageResize.centerY);
@@ -304,6 +358,7 @@ export function EditorCanvas({
     cloneInteractionRef.current = null;
     imageResizeRef.current = null;
     imageDragRef.current = null;
+    cropDragRef.current = null;
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -335,6 +390,7 @@ export function EditorCanvas({
     <div ref={containerRef} className="canvas-container">
       <canvas
         ref={canvasRef}
+        className={cropActive ? 'crop-canvas' : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
