@@ -219,30 +219,7 @@ export function EditorCanvas({
       return;
     }
 
-    if (image && project.image && !cloneActive) {
-      const box = imageDisplayBox(project, image, target.width, target.height);
-      const center = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-      const handles: Handle[] = ['nw', 'ne', 'sw', 'se'];
-      const threshold = 16 * dpr;
-      for (const handle of handles) {
-        const hp = handlePoint(handle, box);
-        if (Math.abs(point.x - hp.x) <= threshold && Math.abs(point.y - hp.y) <= threshold) {
-          setImageSelected(true);
-          const startDistance = Math.max(Math.hypot(hp.x - center.x, hp.y - center.y), 1);
-          imageResizeRef.current = { startDistance, startScale: project.image.scale ?? 1, centerX: center.x, centerY: center.y };
-          canvas.setPointerCapture(event.pointerId);
-          return;
-        }
-      }
-      if (point.x >= box.left && point.x <= box.left + box.width && point.y >= box.top && point.y <= box.top + box.height) {
-        setImageSelected(true);
-        onSelect(null);
-        imageDragRef.current = { startX: point.x, startY: point.y, imageX: project.image.x ?? 0.5, imageY: project.image.y ?? 0.5 };
-        canvas.setPointerCapture(event.pointerId);
-        return;
-      }
-    }
-
+    // 텍스트가 이미지 위에 있어도 텍스트를 먼저 선택한다.
     if (selectedId) {
       const selected = project.texts.find((item) => item.id === selectedId);
       if (selected) {
@@ -266,6 +243,30 @@ export function EditorCanvas({
       if (point.x >= box.left && point.x <= box.left + box.width && point.y >= box.top && point.y <= box.top + box.height) {
         onSelect(item.id);
         interactionRef.current = { mode: 'drag', id: item.id, startX: point.x, startY: point.y, item };
+        canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+    }
+
+    if (image && project.image && !cloneActive) {
+      const box = imageDisplayBox(project, image, target.width, target.height);
+      const center = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+      const handles: Handle[] = ['nw', 'ne', 'sw', 'se'];
+      const threshold = 16 * dpr;
+      for (const handle of handles) {
+        const hp = handlePoint(handle, box);
+        if (Math.abs(point.x - hp.x) <= threshold && Math.abs(point.y - hp.y) <= threshold) {
+          setImageSelected(true);
+          const startDistance = Math.max(Math.hypot(hp.x - center.x, hp.y - center.y), 1);
+          imageResizeRef.current = { startDistance, startScale: project.image.scale ?? 1, centerX: center.x, centerY: center.y };
+          canvas.setPointerCapture(event.pointerId);
+          return;
+        }
+      }
+      if (point.x >= box.left && point.x <= box.left + box.width && point.y >= box.top && point.y <= box.top + box.height) {
+        setImageSelected(true);
+        onSelect(null);
+        imageDragRef.current = { startX: point.x, startY: point.y, imageX: project.image.x ?? 0.5, imageY: project.image.y ?? 0.5 };
         canvas.setPointerCapture(event.pointerId);
         return;
       }
