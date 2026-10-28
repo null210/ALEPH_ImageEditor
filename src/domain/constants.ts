@@ -22,6 +22,7 @@ export const LIMITS = {
 
 export const DEFAULTS = {
   color: '#ffffff',
+  fontFamily: 'system-ui' as const,
   fontSize: 0.06,
   weight: 700 as const,
   align: 'center' as const,

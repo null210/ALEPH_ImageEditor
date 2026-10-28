@@ -11,19 +11,57 @@ interface Props {
   onExportJson: () => void;
   onImportJson: (file: File) => void;
   onOpenTemplates: () => void;
+  onAddText: () => void;
+  onDeleteText: () => void;
+  canDeleteText: boolean;
+  cloneActive: boolean;
+  onCloneToggle: () => void;
+  brushSize: number;
+  onBrushSizeChange: (size: number) => void;
+  canUndoClone: boolean;
+  onUndoClone: () => void;
 }
 
 export function Toolbar(props: Props) {
+  const toolButton = (icon: string, tooltip: string, onClick: () => void, options?: { danger?: boolean; active?: boolean; disabled?: boolean }) => (
+    <button
+      type="button"
+      className={`icon-button${options?.danger ? ' danger' : ''}${options?.active ? ' primary' : ''}`}
+      title={tooltip}
+      aria-label={tooltip}
+      data-tooltip={tooltip}
+      onClick={onClick}
+      disabled={options?.disabled}
+    >
+      <span aria-hidden="true">{icon}</span>
+    </button>
+  );
+
   return (
     <header className="toolbar">
-      <FileUploadButton onFile={props.onFile} />
-      <RatioTabs value={props.ratio} onChange={props.onRatioChange} />
+      <div className="tool-group" aria-label="이미지 도구">
+        <FileUploadButton icon="🖼️" tooltip="이미지 불러오기" onFile={props.onFile} />
+        <RatioTabs value={props.ratio} onChange={props.onRatioChange} />
+      </div>
+      <div className="tool-group" aria-label="편집 도구">
+        {toolButton('➕', '문구 추가', props.onAddText)}
+        {toolButton('🗑️', '선택한 문구 삭제', props.onDeleteText, { danger: true, disabled: !props.canDeleteText })}
+        {toolButton('🖌️', props.cloneActive ? '클론 도장 끄기' : '클론 도장 켜기', props.onCloneToggle, { active: props.cloneActive })}
+        {toolButton('↩️', '클론 실행 취소', props.onUndoClone, { disabled: !props.canUndoClone })}
+        {props.cloneActive && (
+          <label className="toolbar-size" title="클론 도장 크기" data-tooltip="클론 도장 크기">
+            <input type="range" min="0.01" max="0.12" step="0.005" value={props.brushSize} onChange={(e) => props.onBrushSizeChange(Number(e.target.value))} />
+          </label>
+        )}
+      </div>
       <div className="spacer" />
-      <button type="button" onClick={props.onOpenTemplates}>템플릿</button>
-      <button type="button" onClick={props.onSaveTemplate}>템플릿 저장</button>
-      <FileUploadButton label="JSON 불러오기" onFile={props.onImportJson} />
-      <button type="button" onClick={props.onExportJson}>JSON 내보내기</button>
-      <button type="button" className="primary" onClick={props.onExportPng}>PNG 내려받기</button>
+      <div className="tool-group" aria-label="파일 도구">
+        {toolButton('📚', '템플릿 열기', props.onOpenTemplates)}
+        {toolButton('💾', '현재 템플릿 저장', props.onSaveTemplate)}
+        <FileUploadButton icon="📂" tooltip="JSON 불러오기" onFile={props.onImportJson} />
+        {toolButton('📤', 'JSON 내보내기', props.onExportJson)}
+        {toolButton('⬇️', 'PNG 내려받기', props.onExportPng, { active: true })}
+      </div>
     </header>
   );
 }

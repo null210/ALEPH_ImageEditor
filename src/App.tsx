@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EditorCanvas } from './components/EditorCanvas';
 import { Toolbar } from './components/Toolbar';
+import { TemplateDrawer } from './components/TemplateDrawer';
 import { TextList } from './components/TextList';
 import { TextInspector } from './components/TextInspector';
-import { TemplateDrawer } from './components/TemplateDrawer';
 import { Toast } from './components/Toast';
 import { useEditor } from './state/useEditor';
 import { useToast } from './hooks/useToast';
@@ -23,6 +23,8 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [cloneActive, setCloneActive] = useState(false);
+  const [brushSize, setBrushSize] = useState(0.04);
 
   // 프로젝트 이미지가 바뀌면 HTMLImageElement를 다시 로드
   const dataUrl = project.image?.dataUrl ?? null;
@@ -48,6 +50,9 @@ export function App() {
         width: loaded.width,
         height: loaded.height,
         name: file.name,
+        scale: 1,
+        x: 0.5,
+        y: 0.5,
       });
       show('이미지를 불러왔습니다.');
     } catch {
@@ -91,6 +96,18 @@ export function App() {
     setTemplates(repo.list());
   }, [repo]);
 
+  const handleUpdateTemplate = useCallback((id: string) => {
+    const target = repo.list().find((template) => template.id === id);
+    if (!target) return;
+    repo.upsert({
+      ...target,
+      ratio: project.ratio,
+      texts: project.texts.map((text) => ({ ...text })),
+    });
+    setTemplates(repo.list());
+    show(`템플릿 "${target.name}"을 현재 편집 상태로 수정했습니다.`);
+  }, [project, repo, show]);
+
   const handleDeleteTemplate = useCallback((id: string) => {
     repo.remove(id);
     setTemplates(repo.list());
@@ -123,7 +140,22 @@ export function App() {
     show('JSON을 복원했습니다.');
   }, [actions, show]);
 
-  const selectedItem = project.texts.find((t) => t.id === selectedId) ?? null;
+  const handleAddText = useCallback(() => {
+    const id = actions.addText();
+    setSelectedId(id);
+  }, [actions]);
+
+  const handleDeleteText = useCallback(() => {
+    if (!selectedId) return;
+    actions.removeText(selectedId);
+    setSelectedId(null);
+  }, [actions, selectedId]);
+
+  const selectedText = project.texts.find((item) => item.id === selectedId) ?? null;
+  const handleRemoveText = useCallback((id: string) => {
+    actions.removeText(id);
+    if (selectedId === id) setSelectedId(null);
+  }, [actions, selectedId]);
 
   return (
     <div className="app">
@@ -136,22 +168,44 @@ export function App() {
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onOpenTemplates={() => setDrawerOpen(true)}
+        onAddText={handleAddText}
+        onDeleteText={handleDeleteText}
+        canDeleteText={selectedId !== null}
+        cloneActive={cloneActive}
+        onCloneToggle={() => setCloneActive((active) => !active)}
+        brushSize={brushSize}
+        onBrushSizeChange={setBrushSize}
+        canUndoClone={(project.cloneStrokes?.length ?? 0) > 0}
+        onUndoClone={actions.undoClone}
       />
       <main className="layout">
-        <EditorCanvas project={project} image={imageEl} />
+        <EditorCanvas
+          project={project}
+          image={imageEl}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onUpdateText={actions.updateText}
+          onUpdateImage={actions.updateImage}
+          cloneActive={cloneActive}
+          brushSize={brushSize}
+          onStartCloneStroke={actions.startCloneStroke}
+          onAddCloneDab={actions.addCloneDab}
+        />
         <aside className="sidebar">
           <TextList
             texts={project.texts}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onRemove={actions.removeText}
-            onAdd={actions.addText}
+            onRemove={handleRemoveText}
+            onAdd={handleAddText}
           />
-          {selectedItem && (
+          {selectedText ? (
             <TextInspector
-              item={selectedItem}
-              onChange={(patch) => actions.updateText(selectedItem.id, patch)}
+              item={selectedText}
+              onChange={(patch) => actions.updateText(selectedText.id, patch)}
             />
+          ) : (
+            <section className="panel"><p className="muted">편집할 문구를 선택하세요.</p></section>
           )}
         </aside>
       </main>
@@ -162,6 +216,7 @@ export function App() {
         onClose={() => setDrawerOpen(false)}
         onLoad={handleLoadTemplate}
         onRename={handleRenameTemplate}
+        onUpdateCurrent={handleUpdateTemplate}
         onDelete={handleDeleteTemplate}
         onSaveCurrent={handleSaveTemplate}
       />

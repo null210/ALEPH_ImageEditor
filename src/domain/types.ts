@@ -1,6 +1,7 @@
 export type Ratio = '1:1' | '4:5' | '9:16';
 export type Align = 'left' | 'center' | 'right';
 export type Weight = 400 | 700;
+export type FontFamily = 'system-ui' | 'Arial' | 'Georgia' | 'Times New Roman' | 'Courier New';
 
 export interface TextItem {
   id: string;
@@ -9,6 +10,7 @@ export interface TextItem {
   y: number;          // 0~1 정규화 (캔버스 높이 기준)
   fontSize: number;   // 캔버스 폭 대비 비율
   color: string;      // #RRGGBB
+  fontFamily: FontFamily;
   align: Align;
   weight: Weight;
   lineHeight: number; // 배수
@@ -19,6 +21,25 @@ export interface SourceImage {
   width: number;
   height: number;
   name: string;
+  scale: number;
+  x: number;
+  y: number;
+}
+
+export interface CloneDab {
+  x: number;
+  y: number;
+  radius: number;
+  opacity: number;
+}
+
+export interface CloneStroke {
+  id: string;
+  originX: number;
+  originY: number;
+  sourceX: number;
+  sourceY: number;
+  dabs: CloneDab[];
 }
 
 export interface Project {
@@ -26,6 +47,7 @@ export interface Project {
   ratio: Ratio;
   image: SourceImage | null;
   texts: TextItem[];
+  cloneStrokes: CloneStroke[];
 }
 
 export interface Template {

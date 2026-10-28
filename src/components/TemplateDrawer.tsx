@@ -7,12 +7,13 @@ interface Props {
   onClose: () => void;
   onLoad: (template: Template) => void;
   onRename: (id: string, name: string) => void;
+  onUpdateCurrent: (id: string) => void;
   onDelete: (id: string) => void;
   onSaveCurrent: (name: string) => void;
 }
 
 export function TemplateDrawer({
-  open, templates, onClose, onLoad, onRename, onDelete, onSaveCurrent,
+  open, templates, onClose, onLoad, onRename, onUpdateCurrent, onDelete, onSaveCurrent,
 }: Props) {
   const [name, setName] = useState('');
   if (!open) return null;
@@ -58,6 +59,7 @@ export function TemplateDrawer({
                   const next = window.prompt('새 이름', t.name);
                   if (next?.trim()) onRename(t.id, next.trim());
                 }}>이름 변경</button>
+                <button type="button" onClick={() => onUpdateCurrent(t.id)}>현재 상태로 수정</button>
                 <button type="button" className="danger" onClick={() => onDelete(t.id)}>삭제</button>
               </div>
             </li>

@@ -1,7 +1,7 @@
-import { LIMITS } from './constants';
+import { DEFAULTS, LIMITS } from './constants';
 import { createId } from './id';
 import { clamp } from '../lib/number';
-import type { Align, Ratio, TemplatePayload, TextItem } from './types';
+import type { Align, FontFamily, Ratio, TemplatePayload, TextItem } from './types';
 
 export type Result<T> =
   | { ok: true; value: T }
@@ -39,11 +39,14 @@ const isAlign = (x: unknown): x is Align =>
   x === 'left' || x === 'center' || x === 'right';
 
 const isWeight = (x: unknown): x is 400 | 700 => x === 400 || x === 700;
+const isHexColor = (x: unknown): x is string => typeof x === 'string' && /^#[0-9a-f]{6}$/i.test(x);
+const FONT_FAMILIES: FontFamily[] = ['system-ui', 'Arial', 'Georgia', 'Times New Roman', 'Courier New'];
+const isFontFamily = (x: unknown): x is FontFamily => typeof x === 'string' && FONT_FAMILIES.includes(x as FontFamily);
 
 function parseTextItem(raw: unknown, i: number): Result<TextItem> {
   if (!isRecord(raw)) return { ok: false, errors: [`texts[${i}]가 객체가 아닙니다.`] };
 
-  const { content, x, y, fontSize, color, align, weight, lineHeight } = raw;
+  const { content, x, y, fontSize, color, fontFamily, align, weight, lineHeight } = raw;
 
   if (typeof content !== 'string')      return { ok: false, errors: [`texts[${i}].content`] };
   if (content.length > LIMITS.maxContentLength)
@@ -51,7 +54,9 @@ function parseTextItem(raw: unknown, i: number): Result<TextItem> {
   if (typeof x !== 'number')            return { ok: false, errors: [`texts[${i}].x`] };
   if (typeof y !== 'number')            return { ok: false, errors: [`texts[${i}].y`] };
   if (typeof fontSize !== 'number')     return { ok: false, errors: [`texts[${i}].fontSize`] };
-  if (typeof color !== 'string')        return { ok: false, errors: [`texts[${i}].color`] };
+  if (!isHexColor(color))               return { ok: false, errors: [`texts[${i}].color 형식 오류`] };
+  if (fontFamily !== undefined && !isFontFamily(fontFamily))
+    return { ok: false, errors: [`texts[${i}].fontFamily`] };
   if (!isAlign(align))                  return { ok: false, errors: [`texts[${i}].align`] };
   if (!isWeight(weight))                return { ok: false, errors: [`texts[${i}].weight`] };
   if (typeof lineHeight !== 'number')   return { ok: false, errors: [`texts[${i}].lineHeight`] };
@@ -65,6 +70,7 @@ function parseTextItem(raw: unknown, i: number): Result<TextItem> {
       y: clamp(y, 0, 1),
       fontSize: clamp(fontSize, LIMITS.minFontSize, LIMITS.maxFontSize),
       color,
+      fontFamily: isFontFamily(fontFamily) ? fontFamily : DEFAULTS.fontFamily,
       align,
       weight,
       lineHeight: clamp(lineHeight, LIMITS.minLineHeight, LIMITS.maxLineHeight),

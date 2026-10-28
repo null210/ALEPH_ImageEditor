@@ -1,5 +1,5 @@
 import { LIMITS } from '../domain/constants';
-import type { Align, TextItem, Weight } from '../domain/types';
+import type { Align, FontFamily, TextItem, Weight } from '../domain/types';
 
 interface Props {
   item: TextItem;
@@ -8,6 +8,7 @@ interface Props {
 
 const ALIGNS: Align[] = ['left', 'center', 'right'];
 const WEIGHTS: Weight[] = [400, 700];
+const FONT_FAMILIES: FontFamily[] = ['system-ui', 'Arial', 'Georgia', 'Times New Roman', 'Courier New'];
 
 export function TextInspector({ item, onChange }: Props) {
   return (
@@ -24,17 +25,28 @@ export function TextInspector({ item, onChange }: Props) {
         />
       </label>
 
-      <label>
-        크기 <span className="muted">{(item.fontSize * 100).toFixed(1)}%</span>
-        <input
-          type="range"
-          min={0.01}
-          max={0.3}
-          step={0.001}
-          value={item.fontSize}
-          onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-        />
-      </label>
+      <div className="row">
+        <label>
+          글자 크기 <span className="muted">{Math.round(item.fontSize * 1000) / 10}%</span>
+          <input
+            type="range"
+            min={LIMITS.minFontSize}
+            max={LIMITS.maxFontSize}
+            step={0.005}
+            value={item.fontSize}
+            onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+          />
+        </label>
+        <label>
+          글꼴
+          <select
+            value={item.fontFamily}
+            onChange={(e) => onChange({ fontFamily: e.target.value as FontFamily })}
+          >
+            {FONT_FAMILIES.map((font) => <option key={font} value={font}>{font}</option>)}
+          </select>
+        </label>
+      </div>
 
       <label>
         줄 간격 <span className="muted">{item.lineHeight.toFixed(1)}</span>
@@ -45,22 +57,6 @@ export function TextInspector({ item, onChange }: Props) {
           step={0.1}
           value={item.lineHeight}
           onChange={(e) => onChange({ lineHeight: Number(e.target.value) })}
-        />
-      </label>
-
-      <label>
-        X <span className="muted">{item.x.toFixed(2)}</span>
-        <input
-          type="range" min={0} max={1} step={0.001} value={item.x}
-          onChange={(e) => onChange({ x: Number(e.target.value) })}
-        />
-      </label>
-
-      <label>
-        Y <span className="muted">{item.y.toFixed(2)}</span>
-        <input
-          type="range" min={0} max={1} step={0.001} value={item.y}
-          onChange={(e) => onChange({ y: Number(e.target.value) })}
         />
       </label>
 

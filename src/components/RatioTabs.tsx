@@ -14,11 +14,14 @@ export function RatioTabs({ value, onChange }: Props) {
           key={ratio}
           type="button"
           role="tab"
+          aria-label={`${ratio} 비율로 변경`}
+          title={`${ratio} 비율로 변경`}
+          data-tooltip={`${ratio} 비율로 변경`}
           aria-selected={ratio === value}
           className={ratio === value ? 'active' : ''}
           onClick={() => onChange(ratio)}
         >
-          {ratio}
+          {ratio === '1:1' ? '⬜ 1:1' : ratio === '4:5' ? '▯ 4:5' : '▯ 9:16'}
         </button>
       ))}
     </div>
