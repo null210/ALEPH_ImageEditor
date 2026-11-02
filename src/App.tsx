@@ -7,6 +7,9 @@ import { TextInspector } from './components/TextInspector';
 import { Toast } from './components/Toast';
 import { useEditor } from './state/useEditor';
 import { useToast } from './hooks/useToast';
+import { useImageHistory } from './hooks/useImageHistory';
+import { checkSelection, type SelectionRect } from './domain/selection';
+import { removeBackgroundFromImage } from './lib/imageProcessing';
 import { createId } from './domain/id';
 import { parseTemplatePayload, validateImageFile } from './domain/validation';
 import { decodeImage, loadImageFromFile } from './lib/imageLoader';
@@ -27,6 +30,10 @@ export function App() {
   const [brushSize, setBrushSize] = useState(0.04);
   const [cropActive, setCropActive] = useState(false);
   const [cropRect, setCropRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [selectActive, setSelectActive] = useState(false);
+  const [selection, setSelection] = useState<SelectionRect | null>(null);
+  const [removalProgress, setRemovalProgress] = useState<number | null>(null);
+  const imageHistory = useImageHistory();
 
   // 프로젝트 이미지가 바뀌면 HTMLImageElement를 다시 로드
   const dataUrl = project.image?.dataUrl ?? null;
@@ -56,11 +63,66 @@ export function App() {
         x: 0.5,
         y: 0.5,
       });
+      imageHistory.clear();
+      setSelection(null);
       show('이미지를 불러왔습니다.');
     } catch {
       show('이미지를 불러오지 못했습니다.');
     }
-  }, [actions, show]);
+  }, [actions, show, imageHistory]);
+
+  const handleRemoveBackground = useCallback(async () => {
+    if (removalProgress !== null) return; // 중복 실행 방지
+    const check = checkSelection(selection, project.image);
+    if (!check.ok) { show(check.reason); return; } // TEST-05, TEST-09
+    if (!imageEl || !project.image) return;
+
+    const snapshot = project.image;
+    setRemovalProgress(0); // 즉시 로딩 표시 (TEST-03, TEST-08)
+    try {
+      const result = await removeBackgroundFromImage(imageEl, check.pixelRect, {
+        onProgress: (ratio) => setRemovalProgress(ratio),
+      });
+      if (result.removed === 0) {
+        show('제거할 배경을 찾지 못했습니다.');
+        return;
+      }
+      imageHistory.record(snapshot);
+      actions.updateImage({ dataUrl: result.dataUrl, hasTransparency: true });
+      setSelection(null);
+      show(`배경을 제거했습니다. (${result.removed.toLocaleString()}px)`);
+    } catch {
+      show('배경 제거에 실패했습니다.');
+    } finally {
+      setRemovalProgress(null);
+    }
+  }, [removalProgress, selection, project.image, imageEl, imageHistory, actions, show]);
+
+  const handleUndoImage = useCallback(() => {
+    const previous = imageHistory.undo();
+    if (!previous) return;
+    actions.setImage(previous);
+    show('배경 제거를 취소했습니다.');
+  }, [imageHistory, actions, show]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey) return;
+
+      const target = event.target;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable
+        || target.closest('input, textarea, select, [contenteditable="true"]')
+      )) return;
+
+      if (!imageHistory.canUndo || removalProgress !== null) return;
+      event.preventDefault();
+      handleUndoImage();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndoImage, imageHistory.canUndo, removalProgress]);
 
   const handleCropApply = useCallback(() => {
     if (!cropRect || !imageEl || !project.image) return;
@@ -199,16 +261,45 @@ export function App() {
         onDeleteText={handleDeleteText}
         canDeleteText={selectedId !== null}
         cloneActive={cloneActive}
-        onCloneToggle={() => setCloneActive((active) => !active)}
+        onCloneToggle={() => {
+          const next = !cloneActive;
+          setCloneActive(next);
+          if (next) {
+            setCropActive(false);
+            setCropRect(null);
+            setSelectActive(false);
+            setSelection(null);
+          }
+        }}
         brushSize={brushSize}
         onBrushSizeChange={setBrushSize}
         canUndoClone={(project.cloneStrokes?.length ?? 0) > 0}
         onUndoClone={actions.undoClone}
         cropActive={cropActive}
-        onCropToggle={() => { setCropActive((active) => !active); setCropRect(null); }}
+        onCropToggle={() => {
+          const next = !cropActive;
+          setCropActive(next);
+          setCropRect(null);
+          if (next) {
+            setSelectActive(false);
+            setSelection(null);
+            setCloneActive(false);
+          }
+        }}
         canApplyCrop={cropRect !== null}
         onCropApply={handleCropApply}
         onCropCancel={handleCropCancel}
+        selectActive={selectActive}
+        onSelectToggle={() => {
+          setSelectActive((active) => !active);
+          setSelection(null);
+          setCropActive(false);
+          setCloneActive(false);
+        }}
+        onRemoveBackground={handleRemoveBackground}
+        removalProgress={removalProgress}
+        canUndoImage={imageHistory.canUndo}
+        onUndoImage={handleUndoImage}
       />
       <main className="layout">
         <EditorCanvas
@@ -225,6 +316,9 @@ export function App() {
           cropActive={cropActive}
           cropRect={cropRect}
           onCropRectChange={setCropRect}
+          selectActive={selectActive}
+          selection={selection}
+          onSelectionChange={setSelection}
         />
         <aside className="sidebar">
           <TextList

@@ -24,6 +24,8 @@ export interface SourceImage {
   scale: number;
   x: number;
   y: number;
+  /** 배경 제거 등으로 투명 픽셀을 포함하는지 여부 (투명 배경 렌더/PNG 알파 유지). */
+  hasTransparency?: boolean;
 }
 
 export interface CloneDab {

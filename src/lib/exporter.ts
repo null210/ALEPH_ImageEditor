@@ -15,7 +15,7 @@ export async function exportProjectPng(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D context unavailable');
 
-  renderProject(ctx, project, image, target);
+  renderProject(ctx, project, image, target, 'export');
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(

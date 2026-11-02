@@ -4,6 +4,7 @@ import { measureTextItem } from '../lib/textLayout';
 import { clamp } from '../lib/number';
 import { LIMITS, RATIO_DIMS } from '../domain/constants';
 import { createId } from '../domain/id';
+import { rectFromDrag, toDisplayRect, type SelectionRect } from '../domain/selection';
 import type { CloneDab, CloneStroke, Project, TextItem } from '../domain/types';
 
 interface Props {
@@ -20,6 +21,10 @@ interface Props {
   cropActive: boolean;
   cropRect: { x: number; y: number; width: number; height: number } | null;
   onCropRectChange: (rect: { x: number; y: number; width: number; height: number } | null) => void;
+  /** 배경 제거용 사각형 선택 모드 */
+  selectActive: boolean;
+  selection: SelectionRect | null;
+  onSelectionChange: (rect: SelectionRect | null) => void;
 }
 
 type Handle = 'nw' | 'ne' | 'sw' | 'se';
@@ -36,6 +41,7 @@ export function EditorCanvas({
   project, image, selectedId, onSelect, onUpdateText, onUpdateImage,
   cloneActive, brushSize, onStartCloneStroke, onAddCloneDab,
   cropActive, cropRect, onCropRectChange,
+  selectActive, selection, onSelectionChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,6 +51,7 @@ export function EditorCanvas({
   const imageResizeRef = useRef<{ startDistance: number; startScale: number; centerX: number; centerY: number } | null>(null);
   const imageDragRef = useRef<{ startX: number; startY: number; imageX: number; imageY: number } | null>(null);
   const cropDragRef = useRef<{ startPoint: { x: number; y: number }; box: ReturnType<typeof imageDisplayBox> } | null>(null);
+  const selectDragRef = useRef<{ x: number; y: number } | null>(null);
   const [imageSelected, setImageSelected] = useState(false);
   const [displayWidth, setDisplayWidth] = useState(0);
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
@@ -116,6 +123,10 @@ export function EditorCanvas({
       ctx.restore();
     }
 
+    if (selectActive && image && selection) {
+      drawSelectionBox(ctx, toDisplayRect(selection, imageDisplayBox(project, image, target.width, target.height)), dpr);
+    }
+
     if (selectedId) {
       const item = project.texts.find((text) => text.id === selectedId);
       if (item) {
@@ -157,7 +168,7 @@ export function EditorCanvas({
       }
       ctx.restore();
     }
-  }, [project, image, displayWidth, selectedId, imageSelected, cloneActive, brushSize, hoverPoint, samplePoint, cropActive, cropRect]);
+  }, [project, image, displayWidth, selectedId, imageSelected, cloneActive, brushSize, hoverPoint, samplePoint, cropActive, cropRect, selectActive, selection]);
 
   const pointInCanvas = (event: React.PointerEvent<HTMLCanvasElement>, target: { width: number; height: number }) => {
     const canvas = canvasRef.current!;
@@ -181,6 +192,16 @@ export function EditorCanvas({
     const point = pointInCanvas(event, target);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    if (selectActive) {
+      // 이미지 밖에서 시작해도 rectFromDrag가 이미지 경계로 잘라낸다
+      if (image) {
+        selectDragRef.current = point;
+        canvas.setPointerCapture(event.pointerId);
+        onSelectionChange(null);
+      }
+      return;
+    }
 
     if (cropActive && image && project.image) {
       const box = imageDisplayBox(project, image, target.width, target.height);
@@ -292,6 +313,14 @@ export function EditorCanvas({
       return;
     }
 
+    const selectStart = selectDragRef.current;
+    if (selectStart && image) {
+      // 드래그하는 동안 매 이동마다 선택 박스를 갱신 → 실시간 점선 박스 (TEST-02)
+      const box = imageDisplayBox(project, image, target.width, target.height);
+      onSelectionChange(rectFromDrag(selectStart, point, box));
+      return;
+    }
+
     const cropDrag = cropDragRef.current;
     if (cropDrag) {
       const { startPoint, box } = cropDrag;
@@ -360,6 +389,7 @@ export function EditorCanvas({
     imageResizeRef.current = null;
     imageDragRef.current = null;
     cropDragRef.current = null;
+    selectDragRef.current = null;
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -391,7 +421,7 @@ export function EditorCanvas({
     <div ref={containerRef} className="canvas-container">
       <canvas
         ref={canvasRef}
-        className={cropActive ? 'crop-canvas' : undefined}
+        className={cropActive || selectActive ? 'crop-canvas' : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -401,4 +431,23 @@ export function EditorCanvas({
       />
     </div>
   );
+}
+
+/** 선택 영역 시각화: 반투명 채움 + 흑/백 이중 점선 (어떤 배경에서도 보이도록). */
+function drawSelectionBox(
+  ctx: CanvasRenderingContext2D,
+  rect: { left: number; top: number; width: number; height: number },
+  dpr: number,
+): void {
+  ctx.save();
+  ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+  ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.setLineDash([6 * dpr, 4 * dpr]);
+  ctx.strokeStyle = '#000000';
+  ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+  ctx.lineDashOffset = 5 * dpr;
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+  ctx.restore();
 }

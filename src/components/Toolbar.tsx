@@ -25,6 +25,13 @@ interface Props {
   canApplyCrop: boolean;
   onCropApply: () => void;
   onCropCancel: () => void;
+  selectActive: boolean;
+  onSelectToggle: () => void;
+  onRemoveBackground: () => void;
+  /** 배경 제거 진행률 (0~1). null이면 처리 중 아님. */
+  removalProgress: number | null;
+  canUndoImage: boolean;
+  onUndoImage: () => void;
 }
 
 export function Toolbar(props: Props) {
@@ -56,6 +63,15 @@ export function Toolbar(props: Props) {
         {toolButton('✂️', props.cropActive ? '잘라내기 모드 끄기' : '이미지 잘라내기', props.onCropToggle, { active: props.cropActive })}
         {props.cropActive && toolButton('✅', '잘라내기 적용', props.onCropApply, { active: true, disabled: !props.canApplyCrop })}
         {props.cropActive && toolButton('❌', '잘라내기 취소', props.onCropCancel, { danger: true })}
+        {toolButton('🔲', props.selectActive ? '영역 선택 끄기' : '영역 선택 (배경 제거)', props.onSelectToggle, { active: props.selectActive })}
+        {props.selectActive && toolButton('🪄', '선택 영역 배경 제거', props.onRemoveBackground, { active: true, disabled: props.removalProgress !== null })}
+        {toolButton('⎌', '배경 제거 실행 취소 (Ctrl+Z)', props.onUndoImage, { disabled: !props.canUndoImage || props.removalProgress !== null })}
+        {props.removalProgress !== null && (
+          <span className="busy-indicator" role="status" aria-live="polite">
+            <span className="spinner" aria-hidden="true" />
+            배경 제거 중… {Math.round(props.removalProgress * 100)}%
+          </span>
+        )}
         {props.cloneActive && (
           <label className="toolbar-size" title="클론 도장 크기" data-tooltip="클론 도장 크기">
             <input type="range" min="0.01" max="0.12" step="0.005" value={props.brushSize} onChange={(e) => props.onBrushSizeChange(Number(e.target.value))} />

@@ -128,3 +128,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   .sidebar { border-left: 0; border-top: 1px solid #333; }
   .canvas-container { height: 100%; }
 }
+
+/* 배경 제거 진행 표시 (TEST-08) */
+.busy-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #cbd5e1; }
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid #475569; border-top-color: #3b82f6;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
